@@ -12,6 +12,7 @@ type Value interface{}
 
 type LoadFunc func(key Key) (Value, error)
 type Option func(g *LoadingCache)
+type CustomExpire func(value Value) bool
 
 const DefaultSize int = 1 << 30
 
@@ -88,6 +89,9 @@ func BuildLoadingCache(options ...Option) *LoadingCache {
  * 3.如果access or write还没有超时。但是refreshAfterWrite的超时，会异步loader返回旧值。
  */
 func (g *LoadingCache) Get(key Key) (Value, error) {
+	return g.GetWithExpiredFunc(key, nil)
+}
+func (g *LoadingCache) GetWithExpiredFunc(key Key, f CustomExpire) (Value, error) {
 	element, hit := g.lruContainer.Get(key)
 	//如果缓存中没有数据。刚运行load方法
 	if !hit {
@@ -96,7 +100,7 @@ func (g *LoadingCache) Get(key Key) (Value, error) {
 	}
 	entry := getEntry(element)
 	//判断数据是效性
-	if g.isExpired(entry, time.Now()) {
+	if g.isExpired(entry, time.Now()) || (f != nil && f(entry.value)) {
 		return g.loadInfo(key)
 	} else {
 		g.checkRefreshAfterWrite(entry)

@@ -86,7 +86,6 @@ func TestMinTime(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	return
 	g := BuildLoadingCache(WithLoader(func(key Key) (value Value, e error) {
 		fmt.Println("在print")
 		return TestA{Value: key.(string)}, nil
@@ -99,6 +98,59 @@ func TestGet(t *testing.T) {
 		g.Get(key)
 		time.Sleep(1 * time.Second)
 		//g.Remove("abc")
+	}
+
+}
+
+func TestLoadingCache_GetWithExpiredFunc(t *testing.T) {
+
+	type args struct {
+		f CustomExpire
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantSame bool
+	}{
+		{
+			name:     "没有自定义方法",
+			args:     args{f: nil},
+			wantSame: true,
+		},
+		{
+			name: "自定义了方法",
+			args: args{f: func(value Value) bool {
+				return true
+			}},
+			wantSame: false,
+		},
+	}
+
+	flag := true
+	g := BuildLoadingCache(WithLoader(func(key Key) (value Value, e error) {
+		if flag == true {
+			value = "start"
+		}
+		time.Sleep(1 * time.Second)
+
+		return time.Now().Unix(), nil
+	}),
+		WithExpireAfterWrite(2*time.Hour),
+		WithMaximumSize(2),
+		WithExpireAfterAccess(2*time.Hour))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			duplicateMap := make(map[int64]bool)
+			for i := 0; i < 10; i++ {
+				v, _ := g.GetWithExpiredFunc("abc", tt.args.f)
+				duplicateMap[v.(int64)] = true
+			}
+			same := !(len(duplicateMap) == 10)
+			if same != tt.wantSame {
+				t.Errorf("error, want=%v,result=%v, len= %v", tt.wantSame, same, len(duplicateMap))
+			}
+
+		})
 	}
 
 }
