@@ -33,5 +33,7 @@
 ```
 支持以下方法
 - Get
+- GetWithExpiredFunc(key, CustomExpire),CustomExpire 方法可以控制数据是否过期。如果返回true会直接refresh数据
 - Put
 - Remove
+
